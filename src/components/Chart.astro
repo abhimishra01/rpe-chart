@@ -1,0 +1,59 @@
+---
+// The editable RPE chart: percent of 1RM for reps 1 to 12 at RPE 10 down to 6. Values are plain inputs, so the
+// chart is readable without JavaScript. The script in Tool.astro wires them to the calculator.
+import { REPS, RPES, defaultPercent } from '../lib/rpe.js';
+---
+<section id="chart" aria-labelledby="chart-h" class="mx-auto mt-14 max-w-5xl px-4">
+  <div class="rounded-2xl border border-line bg-card p-4 sm:p-6 sm:shadow-[6px_6px_0_0_var(--line)]">
+    <h2 id="chart-h" class="text-2xl font-bold tracking-tight">RPE chart: percent of 1RM</h2>
+    <p class="mt-2 max-w-3xl text-muted">Find your reps down the side and your RPE across the top. The number is the share of your one-rep max (1RM) you can lift for that many reps at that effort. Every value is editable. Change a number and the calculator above uses it. Your changes stay on this device.</p>
+    <div class="mt-4 overflow-x-auto rounded-xl border border-line" tabindex="0" role="region" aria-label="RPE chart, scroll sideways on small screens">
+      <table id="chart-table" class="w-full min-w-[40rem] text-left text-sm tabular-nums">
+        <caption class="sr-only">Percent of one-rep max for each number of reps and each RPE</caption>
+        <thead class="bg-brand-soft text-xs uppercase tracking-wide text-brand-ink">
+          <tr>
+            <th scope="col" class="chart-corner">Reps</th>
+            {RPES.map((r) => <th scope="col" data-rpe={r}>RPE {r}<small>{10 - r} RIR</small></th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {REPS.map((reps) => (
+            <tr>
+              <th scope="row">{reps}</th>
+              {RPES.map((r) => (
+                <td>
+                  <input type="text" inputmode="decimal" autocomplete="off" class="cell" data-reps={reps} data-rpe={r}
+                    value={String(defaultPercent(reps, r))} aria-label={`Percent of 1RM for ${reps} ${reps === 1 ? 'rep' : 'reps'} at RPE ${r}`} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <div class="mt-4 flex flex-wrap items-center gap-3">
+      <button type="button" id="chart-reset" disabled>Reset chart to RTS values</button>
+      <p id="chart-edits" role="status" aria-live="polite" class="min-h-[1.5rem] text-sm text-muted">No changes. The calculator uses the RTS chart as published.</p>
+    </div>
+    <p class="mt-3 text-sm text-muted">Solid frame: your last set. Dotted frame: your next set. Dashed and bold: a value you changed.</p>
+    <p class="mt-3 max-w-3xl text-sm text-muted">Source: the RPE chart of Mike Tuchscherer (Reactive Training Systems, RTS). The RPE scale, based on reps in reserve (RIR), comes from Zourdos et al., 2016, and Helms et al., 2016. Values here run from 1 to 12 reps and from RPE 6 to 10. Copies of this chart on other sites can differ by about 0.5 percent in some cells. Use your own numbers if your coach gives you a different chart.</p>
+  </div>
+</section>
+
+<style is:global>
+  #chart-table th, #chart-table td { padding:.35rem .4rem; }
+  #chart-table thead th { padding:.55rem .5rem; text-align:center; font-weight:700; white-space:nowrap; vertical-align:bottom; }
+  #chart-table thead th small { display:block; font-size:.68rem; font-weight:500; text-transform:none; letter-spacing:0; opacity:.9; }
+  #chart-table thead th.chart-corner { text-align:left; padding-left:.75rem; }
+  #chart-table tbody th { position:sticky; left:0; z-index:1; background:var(--card); padding-left:.75rem; font-weight:700; width:3.5rem; }
+  #chart-table tbody tr + tr > * { border-top:1px solid var(--line); }
+  #chart-table input.cell { width:100%; min-width:3.6rem; min-height:2.75rem; border:1px solid var(--edge); border-radius:.5rem; background:var(--paper); color:var(--ink); text-align:center; font:inherit; font-family:var(--font-mono); font-weight:500; font-variant-numeric:tabular-nums; }
+  #chart-table input.cell:focus-visible { outline:2px solid var(--brand-ink); outline-offset:1px; }
+  #chart-table input.cell[aria-invalid="true"] { border-color:#dc2626; }
+  #chart-table input.cell.edited { background:var(--brand-soft); font-weight:800; border-style:dashed; }
+  #chart-table input.cell.is-set { box-shadow:inset 0 0 0 2px var(--brand); }
+  #chart-table input.cell.is-aim { outline:2px dotted var(--brand-ink); outline-offset:1px; }
+  #chart-reset { min-height:2.75rem; padding:.4rem .9rem; border-radius:.75rem; border:1px solid var(--brand); background:var(--card); font-weight:600; font-size:.95rem; color:var(--brand-ink); cursor:pointer; }
+  #chart-reset:hover:not(:disabled) { background: var(--brand); color:#fff; }
+  #chart-reset:disabled { opacity:.5; cursor:not-allowed; }
+</style>

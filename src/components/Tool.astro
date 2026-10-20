@@ -1,0 +1,352 @@
+---
+// RPE calculator UI. Logic lives in src/lib/rpe.js (tested by npm test). The editable chart is in Chart.astro;
+// both parts share the script below.
+import { REPS } from '../lib/rpe.js';
+---
+<section id="tool" aria-label="RPE calculator" class="rounded-2xl border border-line bg-card p-4 sm:p-6 sm:shadow-[6px_6px_0_0_var(--line)]">
+  <noscript><p class="mb-4 rounded-xl bg-brand-soft p-3 text-sm">This calculator needs JavaScript. The chart and tables below list the percentages you can read without it.</p></noscript>
+  <div class="flex flex-col gap-6 md:grid md:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] md:items-start md:gap-8">
+
+    <!-- The set you did -->
+    <div class="space-y-5">
+      <div class="grid grid-cols-2 gap-3">
+        <fieldset>
+          <legend class="mb-2 text-sm font-semibold">Units</legend>
+          <div class="grid grid-cols-2 gap-2" id="unit-group">
+            <label class="seg"><input type="radio" name="unit" value="lb" class="peer sr-only" checked /><span class="seg-face">lb</span></label>
+            <label class="seg"><input type="radio" name="unit" value="kg" class="peer sr-only" /><span class="seg-face">kg</span></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend class="mb-2 text-sm font-semibold">Effort scale</legend>
+          <div class="grid grid-cols-2 gap-2" id="scale-group">
+            <label class="seg"><input type="radio" name="scale" value="rpe" class="peer sr-only" checked /><span class="seg-face">RPE</span></label>
+            <label class="seg"><input type="radio" name="scale" value="rir" class="peer sr-only" /><span class="seg-face">RIR</span></label>
+          </div>
+        </fieldset>
+      </div>
+
+      <div>
+        <label for="weight" class="mb-2 block text-sm font-semibold">Weight you lifted <span id="unit-label" class="font-normal text-muted">(lb)</span></label>
+        <div class="flex items-stretch gap-2">
+          <button type="button" id="dec" class="step" aria-label="Subtract one step from the weight">&minus;</button>
+          <input id="weight" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" value="225" aria-describedby="e1rm-status"
+            class="h-14 min-w-0 flex-1 rounded-xl border border-edge bg-paper px-3 text-center font-mono text-3xl font-bold tabular-nums outline-none focus:border-brand focus:ring-2 focus:ring-brand/30 aria-[invalid=true]:border-red-600" />
+          <button type="button" id="inc" class="step" aria-label="Add one step to the weight">+</button>
+        </div>
+      </div>
+
+      <fieldset>
+        <legend class="mb-2 text-sm font-semibold">Reps you did</legend>
+        <div class="grid grid-cols-6 gap-2" id="reps-group">
+          {REPS.map((r) => (
+            <label class="seg"><input type="radio" name="reps" value={r} class="peer sr-only" checked={r === 5} /><span class="seg-face seg-num">{r}</span></label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend id="rpe-legend" class="mb-2 text-sm font-semibold">How hard it felt (RPE)</legend>
+        <div class="grid grid-cols-3 gap-2 sm:grid-cols-5" id="rpe-group"></div>
+        <p id="rpe-meaning" class="mt-2 min-h-[2.5rem] text-sm text-muted"></p>
+      </fieldset>
+    </div>
+
+    <!-- Results -->
+    <div class="min-w-0 space-y-4 md:sticky md:top-20">
+      <div class="min-h-[10.5rem] rounded-xl bg-brand-soft p-4" id="result-box">
+        <p class="text-sm font-semibold uppercase tracking-wide text-brand-ink">Estimated 1RM</p>
+        <p id="e1rm-out" class="mt-2 font-mono text-5xl font-bold tabular-nums leading-none">-</p>
+        <p id="e1rm-status" role="status" aria-live="polite" class="mt-3 min-h-[3rem] text-base font-medium"></p>
+      </div>
+
+      <div id="plan-box" class="rounded-xl border border-line p-4">
+        <h2 class="text-sm font-semibold">Plan your next set</h2>
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <div>
+            <label for="t-reps" class="mb-1 block text-sm text-muted">Reps</label>
+            <select id="t-reps" class="sel">
+              {REPS.map((r) => <option value={r} selected={r === 3}>{r}</option>)}
+            </select>
+          </div>
+          <div>
+            <label for="t-rpe" id="t-rpe-label" class="mb-1 block text-sm text-muted">At RPE</label>
+            <select id="t-rpe" class="sel"></select>
+          </div>
+        </div>
+        <p class="mt-4 text-sm text-muted">Load on the bar</p>
+        <p id="target-out" class="font-mono text-4xl font-bold tabular-nums leading-tight">-</p>
+        <p id="target-status" role="status" aria-live="polite" class="mt-1 min-h-[3rem] text-sm text-muted"></p>
+
+        <fieldset class="mt-3">
+          <legend class="mb-2 text-sm font-semibold">Round to the nearest</legend>
+          <div class="grid grid-cols-3 gap-2" id="step-group"></div>
+          <p class="mt-1 text-xs text-muted">This is the smallest jump your plates can make: two of your smallest plates.</p>
+        </fieldset>
+      </div>
+    </div>
+  </div>
+
+  <!-- Weights for every rep count -->
+  <div class="mt-8 border-t border-line pt-6">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-lg font-bold">Your weights for every reps and <span id="scale-word">RPE</span></h2>
+      <label class="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold">
+        <input id="half" type="checkbox" class="h-6 w-6 shrink-0 accent-[var(--brand)]" />
+        Show half steps
+      </label>
+    </div>
+    <p class="mt-1 text-sm text-muted">Each weight is a share of your estimated 1RM, rounded to your plates. The cell for your last set is shaded. The cell for the next set has a frame.</p>
+    <div class="mt-3 overflow-x-auto rounded-xl border border-line" tabindex="0" role="region" aria-label="Weights table, scroll sideways on small screens">
+      <table id="plan-table" class="w-full min-w-[22rem] text-left text-sm tabular-nums">
+        <caption class="sr-only">Weight to lift for each number of reps and each effort level, based on your estimated 1RM</caption>
+        <thead id="plan-head" class="bg-brand-soft text-xs uppercase tracking-wide text-brand-ink"></thead>
+        <tbody id="plan-body" class="divide-y divide-line"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<style is:global>
+  .seg-face { display:flex; min-height:3rem; align-items:center; justify-content:center; border-radius:.75rem; border:1px solid var(--edge); background:var(--paper); padding:.4rem .5rem; font-weight:600; font-size:.95rem; cursor:pointer; text-align:center; transition:background-color .12s,border-color .12s; user-select:none; font-variant-numeric:tabular-nums; }
+  .seg-face small { display:block; font-size:.7rem; font-weight:500; opacity:.85; line-height:1; }
+  .seg-face.tall { flex-direction:column; gap:.15rem; }
+  .seg-face:hover { border-color: var(--brand); }
+  .peer:checked + .seg-face { background: var(--brand); border-color: var(--brand); color:#fff; }
+  .peer:focus-visible + .seg-face { outline:2px solid var(--brand-ink); outline-offset:2px; }
+  .step { width:3.5rem; flex:none; border-radius:.75rem; border:1px solid var(--edge); background:var(--paper); font-size:1.75rem; font-weight:600; line-height:1; cursor:pointer; }
+  .step:hover { border-color: var(--brand); }
+  .step:active { background: var(--brand-soft); }
+  .sel { width:100%; min-height:3rem; border-radius:.75rem; border:1px solid var(--edge); background:var(--paper); color:var(--ink); padding:.4rem .6rem; font-weight:600; font-size:1.05rem; font-variant-numeric:tabular-nums; }
+  .sel:focus-visible { outline:2px solid var(--brand-ink); outline-offset:2px; }
+  #plan-table th, #plan-table td { padding:.55rem .7rem; white-space:nowrap; }
+  #plan-table thead th { font-weight:700; vertical-align:bottom; }
+  #plan-table thead th small { display:block; font-size:.68rem; font-weight:500; text-transform:none; letter-spacing:0; opacity:.9; }
+  #plan-table tbody th { position:sticky; left:0; background:var(--card); font-weight:700; }
+  #plan-table td.is-set { background: var(--brand-soft); font-weight:700; }
+  #plan-table td.is-aim { box-shadow: inset 0 0 0 2px var(--brand-ink); font-weight:700; }
+</style>
+<script>
+  import {
+    RPES, WHOLE_RPES, REPS, STEPS, DEFAULT_STEP, MAX_WEIGHT, cellKey, defaultPercent, percentAt, isValidPercent,
+    e1rm, loadFor, roundTo, convertWeight, parseNumber, fmt, rpeToRir, rpeMeaning,
+  } from '../lib/rpe.js';
+
+  type Unit = 'lb' | 'kg';
+  type Scale = 'rpe' | 'rir';
+
+  const KEY = 'rpe-chart-v1';
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+  const state = {
+    unit: 'lb' as Unit,
+    scale: 'rpe' as Scale,
+    weight: 225,
+    reps: 5,
+    rpe: 8,
+    tReps: 3,
+    tRpe: 8,
+    step: { ...DEFAULT_STEP } as Record<Unit, number>,
+    half: false,
+    edits: {} as Record<string, number>,
+  };
+
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (s && typeof s === 'object') {
+      if (s.unit === 'lb' || s.unit === 'kg') state.unit = s.unit;
+      if (s.scale === 'rpe' || s.scale === 'rir') state.scale = s.scale;
+      if (typeof s.weight === 'number' && s.weight > 0 && s.weight <= MAX_WEIGHT) state.weight = s.weight;
+      if ((REPS as number[]).includes(s.reps)) state.reps = s.reps;
+      if ((RPES as number[]).includes(s.rpe)) state.rpe = s.rpe;
+      if ((REPS as number[]).includes(s.tReps)) state.tReps = s.tReps;
+      if ((RPES as number[]).includes(s.tRpe)) state.tRpe = s.tRpe;
+      for (const u of ['lb', 'kg'] as Unit[]) if (s.step && (STEPS[u] as number[]).includes(s.step[u])) state.step[u] = s.step[u];
+      state.half = s.half === true;
+      if (s.edits && typeof s.edits === 'object') {
+        for (const [k, v] of Object.entries(s.edits)) {
+          const m = /^(\d+)@(\d+(?:\.5)?)$/.exec(k);
+          if (m && (REPS as number[]).includes(+m[1]) && (RPES as number[]).includes(+m[2]) && isValidPercent(v)) state.edits[k] = v as number;
+        }
+      }
+    }
+  } catch {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
+
+  // The last weight the person typed, so a unit round trip returns to it (225 lb, 102.1 kg, 225 lb).
+  let anchor = { unit: state.unit, weight: state.weight };
+
+  const rpeLabel = (rpe: number) => (state.scale === 'rpe' ? `RPE ${fmt(rpe)}` : `RIR ${fmt(rpeToRir(rpe))}`);
+  const otherLabel = (rpe: number) => (state.scale === 'rpe' ? `${fmt(rpeToRir(rpe))} RIR` : `RPE ${fmt(rpe)}`);
+  const scaleWord = () => (state.scale === 'rpe' ? 'RPE' : 'RIR');
+  const eff = (rpe: number) => (state.scale === 'rpe' ? fmt(rpe) : fmt(rpeToRir(rpe)));
+
+  function buildStatic() {
+    const u = state.unit;
+    (document.querySelector(`input[name=unit][value=${u}]`) as HTMLInputElement).checked = true;
+    (document.querySelector(`input[name=scale][value=${state.scale}]`) as HTMLInputElement).checked = true;
+    (document.querySelector(`input[name=reps][value="${state.reps}"]`) as HTMLInputElement).checked = true;
+    $('unit-label').textContent = `(${u})`;
+    $<HTMLInputElement>('weight').value = fmt(state.weight);
+    $<HTMLInputElement>('half').checked = state.half;
+    $<HTMLSelectElement>('t-reps').value = String(state.tReps);
+    $('scale-word').textContent = scaleWord();
+    $('rpe-legend').textContent = state.scale === 'rpe' ? 'How hard it felt (RPE)' : 'Reps you had left (RIR)';
+    $('t-rpe-label').textContent = state.scale === 'rpe' ? 'At RPE' : 'With RIR';
+
+    $('rpe-group').innerHTML = RPES.map((r) =>
+      `<label class="seg"><input type="radio" name="rpe" value="${r}" class="peer sr-only"${r === state.rpe ? ' checked' : ''} /><span class="seg-face tall">${eff(r)}${state.scale === 'rpe' ? `<small>${fmt(rpeToRir(r))} RIR</small>` : `<small>RPE ${fmt(r)}</small>`}</span></label>`).join('');
+    $('t-rpe').innerHTML = RPES.map((r) => `<option value="${r}"${r === state.tRpe ? ' selected' : ''}>${eff(r)}${state.scale === 'rpe' ? '' : ' (RPE ' + fmt(r) + ')'}</option>`).join('');
+    $('step-group').innerHTML = STEPS[u].map((s) =>
+      `<label class="seg"><input type="radio" name="step" value="${s}" class="peer sr-only"${s === state.step[u] ? ' checked' : ''} /><span class="seg-face">${s} ${u}</span></label>`).join('');
+
+    // Chart headers and the reset button follow the scale.
+    document.querySelectorAll<HTMLElement>('#chart [data-rpe]').forEach((th) => {
+      const r = Number(th.dataset.rpe);
+      th.innerHTML = `${rpeLabel(r)}<small>${otherLabel(r)}</small>`;
+    });
+    document.querySelectorAll<HTMLInputElement>('#chart input[data-reps]').forEach((inp) => {
+      const r = Number(inp.dataset.reps), p = Number(inp.dataset.rpe);
+      inp.setAttribute('aria-label', `Percent of 1RM for ${r} ${r === 1 ? 'rep' : 'reps'} at ${rpeLabel(p)}`);
+    });
+  }
+
+  const step = () => state.step[state.unit];
+
+  function renderChart() {
+    let edited = 0;
+    document.querySelectorAll<HTMLInputElement>('#chart input[data-reps]').forEach((inp) => {
+      const r = Number(inp.dataset.reps), p = Number(inp.dataset.rpe);
+      const k = cellKey(r, p);
+      const isEdit = k in state.edits;
+      if (isEdit) edited++;
+      inp.classList.toggle('edited', isEdit);
+      inp.classList.toggle('is-set', r === state.reps && p === state.rpe);
+      inp.classList.toggle('is-aim', r === state.tReps && p === state.tRpe);
+      if (document.activeElement !== inp) { inp.value = fmt(percentAt(r, p, state.edits)); inp.removeAttribute('aria-invalid'); }
+    });
+    const note = $('chart-edits');
+    note.textContent = edited ? `${edited} ${edited === 1 ? 'value is' : 'values are'} changed from the RTS chart. The calculator uses your values.` : 'No changes. The calculator uses the RTS chart as published.';
+    $<HTMLButtonElement>('chart-reset').disabled = edited === 0;
+  }
+
+  function render() {
+    const u = state.unit;
+    const out = $('e1rm-out');
+    const status = $('e1rm-status');
+    const tOut = $('target-out');
+    const tStatus = $('target-status');
+    $('rpe-meaning').textContent = `${rpeLabel(state.rpe)}: ${rpeMeaning(state.rpe)}`;
+
+    const oneRm = e1rm(state.weight, state.reps, state.rpe, state.edits);
+    const head = $('plan-head'), body = $('plan-body');
+    const cols = (state.half ? RPES : WHOLE_RPES) as number[];
+
+    if (!Number.isFinite(oneRm)) {
+      out.textContent = '-';
+      status.textContent = 'Enter the weight you lifted to see your estimated 1RM.';
+      tOut.textContent = '-';
+      tStatus.textContent = '';
+      head.innerHTML = '';
+      body.innerHTML = '';
+      renderChart();
+      save();
+      return;
+    }
+
+    const pct = percentAt(state.reps, state.rpe, state.edits);
+    out.textContent = `${fmt(Math.round(oneRm * 10) / 10)} ${u}`;
+    status.textContent = state.reps === 1 && state.rpe === 10
+      ? `A single at ${rpeLabel(state.rpe)} is your 1RM: ${fmt(state.weight)} ${u}.`
+      : `${fmt(state.weight)} ${u} for ${state.reps} ${state.reps === 1 ? 'rep' : 'reps'} at ${rpeLabel(state.rpe)} is ${fmt(pct)}% of your 1RM.`;
+
+    const exact = loadFor(oneRm, state.tReps, state.tRpe, state.edits);
+    const rounded = roundTo(exact, step());
+    const tp = percentAt(state.tReps, state.tRpe, state.edits);
+    tOut.textContent = `${fmt(rounded)} ${u}`;
+    tStatus.textContent = `${state.tReps} ${state.tReps === 1 ? 'rep' : 'reps'} at ${rpeLabel(state.tRpe)} is ${fmt(tp)}% of 1RM. Exact: ${fmt(Math.round(exact * 10) / 10)} ${u}, rounded to ${step()} ${u}.`;
+
+    head.innerHTML = `<tr><th scope="col">Reps</th>${cols.map((r) => `<th scope="col">${rpeLabel(r)}<small>${otherLabel(r)}</small></th>`).join('')}</tr>`;
+    body.innerHTML = (REPS as number[]).map((reps) =>
+      `<tr><th scope="row">${reps}</th>${cols.map((r) => {
+        const w = roundTo(loadFor(oneRm, reps, r, state.edits), step());
+        const cls = reps === state.reps && r === state.rpe ? ' class="is-set"' : reps === state.tReps && r === state.tRpe ? ' class="is-aim"' : '';
+        const cls2 = reps === state.reps && r === state.rpe && reps === state.tReps && r === state.tRpe ? ' class="is-set is-aim"' : cls;
+        return `<td${cls2}>${fmt(w)}</td>`;
+      }).join('')}</tr>`).join('');
+    renderChart();
+    save();
+  }
+
+  function setWeight(v: number) {
+    if (!(v > 0)) return;
+    state.weight = Math.min(Math.round(v * 100) / 100, MAX_WEIGHT);
+    anchor = { unit: state.unit, weight: state.weight };
+    $<HTMLInputElement>('weight').value = fmt(state.weight);
+    render();
+  }
+  const nudge = (dir: 1 | -1) => setWeight(Math.max(step(), (state.weight || 0) + dir * step()));
+
+  // Weight field
+  const wEl = $<HTMLInputElement>('weight');
+  wEl.addEventListener('input', () => {
+    const v = parseNumber(wEl.value);
+    wEl.setAttribute('aria-invalid', String(wEl.value.trim() !== '' && !(v > 0)));
+    state.weight = v > 0 ? Math.min(v, MAX_WEIGHT) : 0;
+    if (v > MAX_WEIGHT) wEl.value = fmt(MAX_WEIGHT);
+    anchor = { unit: state.unit, weight: state.weight };
+    render();
+  });
+  wEl.addEventListener('blur', () => { if (state.weight > 0) { wEl.value = fmt(state.weight); wEl.removeAttribute('aria-invalid'); } });
+  wEl.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp') { e.preventDefault(); nudge(1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); nudge(-1); }
+  });
+  $('inc').addEventListener('click', () => nudge(1));
+  $('dec').addEventListener('click', () => nudge(-1));
+
+  $('unit-group').addEventListener('change', (e) => {
+    const to = (e.target as HTMLInputElement).value as Unit;
+    if (to === state.unit) return;
+    state.weight = anchor.unit === to && anchor.weight > 0 ? anchor.weight : Math.round(convertWeight(state.weight, state.unit, to) * 10) / 10;
+    state.unit = to;
+    buildStatic(); render();
+  });
+  $('scale-group').addEventListener('change', (e) => {
+    state.scale = (e.target as HTMLInputElement).value as Scale;
+    buildStatic(); render();
+  });
+  $('reps-group').addEventListener('change', (e) => { state.reps = Number((e.target as HTMLInputElement).value); render(); });
+  $('rpe-group').addEventListener('change', (e) => { state.rpe = Number((e.target as HTMLInputElement).value); render(); });
+  $('t-reps').addEventListener('change', (e) => { state.tReps = Number((e.target as HTMLSelectElement).value); render(); });
+  $('t-rpe').addEventListener('change', (e) => { state.tRpe = Number((e.target as HTMLSelectElement).value); render(); });
+  $('step-group').addEventListener('change', (e) => { state.step[state.unit] = Number((e.target as HTMLInputElement).value); render(); });
+  $('half').addEventListener('change', (e) => { state.half = (e.target as HTMLInputElement).checked; render(); });
+
+  // Editable chart: a valid number (20 to 100) replaces the published value. The same number as the published one removes the change.
+  const chart = $('chart');
+  chart.addEventListener('input', (e) => {
+    const inp = e.target as HTMLInputElement;
+    if (!inp.dataset.reps) return;
+    const r = Number(inp.dataset.reps), p = Number(inp.dataset.rpe), k = cellKey(r, p);
+    const v = parseNumber(inp.value);
+    if (isValidPercent(v)) {
+      inp.removeAttribute('aria-invalid');
+      if (v === defaultPercent(r, p)) delete state.edits[k]; else state.edits[k] = v;
+    } else {
+      inp.setAttribute('aria-invalid', 'true');
+      delete state.edits[k];
+    }
+    render();
+  });
+  chart.addEventListener('focusout', (e) => {
+    const inp = e.target as HTMLInputElement;
+    if (!inp.dataset?.reps) return;
+    inp.value = fmt(percentAt(Number(inp.dataset.reps), Number(inp.dataset.rpe), state.edits));
+    inp.removeAttribute('aria-invalid');
+  });
+  $('chart-reset').addEventListener('click', () => { state.edits = {}; render(); });
+
+  buildStatic();
+  render();
+</script>

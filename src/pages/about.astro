@@ -1,0 +1,17 @@
+---
+import Page from '../layouts/Page.astro';
+import site from '../site.config.ts';
+import { url } from '../lib/url.ts';
+---
+<Page title="About" description={`About ${site.name}: a free RPE chart and calculator for lifters.`}>
+  <p>{site.name} turns reps and RPE into a share of your one-rep max. It estimates your 1RM from a set you did, and it shows the weight to lift for any other reps and RPE, rounded to your plates. It works in pounds and kilograms, and in RPE or RIR.</p>
+  <h2>What it does</h2>
+  <p>It answers as you type. Every number in the chart is editable, so you can match the chart your coach uses. The calculator reads your edited values.</p>
+  <h2>How it works</h2>
+  <p>The percentages come from the RPE chart of Mike Tuchscherer of Reactive Training Systems. The RPE scale based on reps in reserve comes from Zourdos and colleagues (2016) and Helms and colleagues (2016). The tool divides your weight by the chart percentage to estimate your 1RM. It then multiplies your 1RM by another percentage to get a target weight, and rounds to the plate jump you choose.</p>
+  <p>The calculator runs in your browser and does not send what you type. We do not ask you to create an account. Your settings and chart edits stay on your device.</p>
+  <h2>A note on safety</h2>
+  <p>The numbers are estimates. This tool is not medical advice and does not replace a coach. If you have a health condition or an injury, ask a doctor before you train hard. Use collars, check your equipment and ask for a spotter on heavy sets.</p>
+  <h2>Contact</h2>
+  <p>Questions or ideas? Write to <a href={`mailto:${site.email}`}>{site.email}</a> or visit the <a href={url('contact/')}>Contact page</a>.</p>
+</Page>
