@@ -1,6 +1,7 @@
 ---
 // SEO article for the RPE chart. The tables are built from the same data as the chart.
 import { defaultPercent, WHOLE_RPES } from '../lib/rpe.js';
+const compare = [[5, 8], [8, 8], [10, 8], [12, 10], [12, 8], [12, 6]];
 const rows = [1, 2, 3, 4, 5, 6, 8, 10, 12];
 ---
 <section aria-labelledby="about-tool" class="mx-auto max-w-5xl px-4 pt-16">
@@ -22,14 +23,14 @@ const rows = [1, 2, 3, 4, 5, 6, 8, 10, 12];
     <p>You squat 225 lb for 5 reps, and it felt like RPE 8. The chart shows 81.1 percent for 5 reps at RPE 8. Your estimated 1RM is 225 &divide; 0.811 = 277.4 lb.</p>
     <p>Next you want 3 reps at RPE 8. The chart shows 86.3 percent. That is 277.4 &times; 0.863 = 239.4 lb. With 5 lb jumps, you load 240 lb.</p>
 
-    <h2>RPE chart: percent of 1RM</h2>
-    <p>These are the chart values for whole RPE numbers. The full chart above also has half steps and 7, 9 and 11 reps.</p>
+    <h2>RPE chart for whole RPE values</h2>
+    <p>These are the values of the current RTS table (the default version) for whole RPE numbers. The full chart above also has half steps and 7, 9 and 11 reps, and the 2016 version.</p>
     <div class="table-wrap">
       <table>
         <thead><tr><th scope="col">Reps</th>{WHOLE_RPES.map((r) => <th scope="col">RPE {r}</th>)}</tr></thead>
         <tbody>
           {rows.map((reps) => (
-            <tr><td>{reps}</td>{WHOLE_RPES.map((r) => <td>{defaultPercent(reps, r).toFixed(1)}%</td>)}</tr>
+            <tr><td>{reps}</td>{WHOLE_RPES.map((r) => <td>{defaultPercent(reps, r, 'current').toFixed(1)}%</td>)}</tr>
           ))}
         </tbody>
       </table>
@@ -45,24 +46,41 @@ const rows = [1, 2, 3, 4, 5, 6, 8, 10, 12];
           <tr><td>9</td><td>1</td><td>One rep left.</td></tr>
           <tr><td>8</td><td>2</td><td>Two reps left.</td></tr>
           <tr><td>7</td><td>3</td><td>Three reps left. The bar still moves fast.</td></tr>
-          <tr><td>6</td><td>4</td><td>Four reps left. A light set.</td></tr>
+          <tr><td>6</td><td>4</td><td>Four or more reps left. A light set.</td></tr>
         </tbody>
       </table>
     </div>
 
+    <h2>Two chart versions</h2>
+    <p>Reactive Training Systems (RTS, Mike Tuchscherer) has published more than one RPE chart, and the numbers are not the same. This page has both. A switch in the calculator picks one.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Set</th><th scope="col">Current RTS (default)</th><th scope="col">2016 RTS article</th></tr></thead>
+        <tbody>
+          {compare.map(([reps, rpe]) => (
+            <tr><td>{reps} {reps === 1 ? 'rep' : 'reps'} at RPE {rpe}</td><td>{defaultPercent(reps, rpe, 'current').toFixed(1)}%</td><td>{defaultPercent(reps, rpe, 'y2016').toFixed(1)}%</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p>The versions differ by up to 7.6 points at high reps. They agree within 0.1 point when reps plus reps in reserve is 10 or less, so low-rep sets give the same answer in both.</p>
+
     <h2>Where the numbers come from</h2>
-    <p>The percentages come from the RPE chart of Mike Tuchscherer of Reactive Training Systems (RTS). The chart adds reps and reps in reserve. Five reps at RPE 8 leave 2 in reserve, so they use the same percentage as 7 reps at RPE 10. That one rule fills the whole table.</p>
+    <p><strong>Current RTS (default).</strong> The current RTS table from their TRAC system. We read it from the open data file <code>rpe_tab_rts.csv</code> in the R package <code>strength</code>. Its documentation says the table was pulled from TRAC in December 2025. We did not read it on the RTS site itself.</p>
+    <p><strong>2016 RTS article.</strong> The chart from the RTS article "Customizing Your RPE Chart" (January 6, 2016), as copied in the open-source RPECalc app. That table ends at RPE 6.5. We add the RPE 6 row with the reps plus RIR rule.</p>
+    <p>Both charts follow one rule: reps plus reps in reserve decides the percentage. Five reps at RPE 8 leave 2 in reserve, so they use the same percentage as 7 reps at RPE 10. The RPE 6 values of the 2016 version are extended this way, because that article has no RPE 6 row.</p>
     <p>The RPE scale based on reps in reserve comes from Zourdos and colleagues (2016, <em>Journal of Strength and Conditioning Research</em>), who tested it on the squat. Helms and colleagues (2016, <em>Strength and Conditioning Journal</em>) explained how to apply it in training.</p>
 
     <h2>Limits you should know</h2>
-    <p>The chart gives an estimate, not a test. People rate effort in different ways. New lifters often rate a set as easier or harder than it was. Ratings tend to be more accurate on heavy sets close to failure, and they improve with practice. Copies of the chart on other sites can differ by about 0.5 percent in some cells, so edit any value to match the chart your coach uses.</p>
+    <p>The chart gives an estimate, not a test. People rate effort in different ways. New lifters often rate a set as easier or harder than it was. Ratings tend to be more accurate on heavy sets close to failure, and they improve with practice. Above about 10 reps, expect a rough estimate: it is harder to judge how many reps are left in a long set, and the two chart versions differ most there. Edit any value to match the chart your coach uses.</p>
     <p>This tool is not medical advice. If you have a health condition or an injury, ask a doctor or a qualified coach before you train hard.</p>
 
     <h2>Why this RPE calculator</h2>
     <ul>
       <li>It answers as you type. There is no button to press.</li>
       <li>You can edit every value in the chart.</li>
-      <li>It rounds each load to your plates, in lb or kg.</li>
+      <li>It has the current RTS table and the 2016 RTS chart, and it names each source.</li>
+      <li>It rounds each load to your plates, in lb or kg, down to 1.25 lb and 0.5 kg.</li>
       <li>It works one-handed on a phone, with large buttons, and has a dark mode.</li>
       <li>It runs in your browser. It does not send what you type.</li>
     </ul>

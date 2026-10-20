@@ -1,0 +1,21 @@
+# Code review, maintainer lens: rpe-chart (Hermione)
+
+Verdict: clean, small, safe code. The pure math is separated and tested, input handling is solid and there is no injection path. What would hurt in a year is that the chart data has no source fixture, and one stray file ships to production. 2 must-fix.
+
+Known template leftovers (not repeated): README of the template, new-tool.sh, tracked screenshots, duplicate legal links, build-date "Last updated", British spelling.
+
+| Sev | Where | Finding | Why | Fix |
+|---|---|---|---|---|
+| must | tests/rpe.test.mjs:5-19 | The `KNOWN` list is the same memory as `SERIES`, so the test passes whatever the truth is. 10 of its 28 cells are not in the current RTS table (see code-regression.md). | A "known values" test that shares its error with the code gives false safety. | Test against a fixture copied from a named source, with its URL and date in a comment. |
+| must | public/.png | A 1280x720 PNG named `.png` is tracked in git and shipped (dist has `/.png`, 4 KB). | Junk file on the live domain, probably a leftover render. | `git rm public/.png`. |
+| should | src/lib/rpe.js:1-11 | The header names RTS, Zourdos and Helms but not which RTS version, where it was copied from, or on what date. The RPE 6 column and 12-rep cells are an extension that is not marked. | The next maintainer cannot tell a typo from a source difference. | Add version, source and date. Say that cells outside the source table come from the reps plus RIR rule. |
+| should | src/components/Tool.astro:129-352 | 220 lines of UI logic (state load, migration, render, events) sit in one inline script with no tests. The lib is tested, the glue is not. | Unit round trip, edit removal and storage restore broke easily in similar tools. I tested them by hand and they work. | Move `loadState`, `cleanEdits` and the unit anchor rule into `rpe.js` (or `state.js`) as pure functions and add tests. Keep the DOM code here. |
+| should | Tool.astro:328-347 | While you edit a chart cell, an invalid value (for example "8" on the way to "85") deletes the saved edit. If you leave the cell then, the edit is gone and the published value returns without a message. | Silent data loss of a user edit. | Keep the old edit until a valid value replaces it, or restore the previous edit on blur. |
+| should | src/pages/index.astro:19 | `applicationCategory: 'HealthApplication'` (config line 21). | The research file classes this tool as SAFE (training arithmetic). Health markup invites health-site (YMYL) treatment and tighter AdSense review. | Use `SportsApplication`. |
+| nice | src/lib/rpe.js:80-86 | `parseNumber('1,000')` gives 1 (comma is read as a decimal point). | Matches the EU style "225,5" on purpose, but a US user who types 1,000 lb gets 1. | Treat a comma followed by exactly 3 digits and no dot as a thousands mark, or ignore. Weights above 999 are rare, so this is low priority. |
+| nice | rpe.js:56-60 | A very light weight (for example 1 lb at 5 lb step) rounds to "0 lb" in the target and in table cells. | Reads as a bug. | Show a note when the rounded load is 0, or never round below one step. |
+| nice | Tool.astro:60,79 | Two `role="status" aria-live="polite"` regions update on every keystroke. | A screen reader repeats the whole result text for each digit. | Debounce the text update by about 400 ms, or keep one live region. |
+| nice | .github/workflows/pages.yml:26 | `PAGES_SITE` is hard-coded to `https://abhimishra01.github.io`. No git remote is set, so I could not check it. | A wrong owner name breaks the Pages base URL. | Confirm the account name before the first push, or use `${{ github.repository_owner }}`. |
+| nice | package.json | `wrangler` stays as a dev dependency. | Large install for one deploy command (template choice). | Leave unless install time matters. |
+
+What I checked and found fine: no `innerHTML` with user data (all inputs are parsed numbers or checked against an allow list); stored state is validated key by key; `try/catch` around storage; huge, empty, negative, exponent and comma input; weight clamp at 5000; division by zero guarded (`!(p > 0)`); the unit anchor keeps 225 lb to kg and back exact; `npm test` passes (12 tests, 0.3 s); build 2.7 s; no console errors; 25 KB transfer.

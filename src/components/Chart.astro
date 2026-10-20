@@ -1,12 +1,13 @@
 ---
 // The editable RPE chart: percent of 1RM for reps 1 to 12 at RPE 10 down to 6. Values are plain inputs, so the
-// chart is readable without JavaScript. The script in Tool.astro wires them to the calculator.
+// chart is readable without JavaScript. Values show the current RTS table; the script swaps in the 2016 version when chosen. The script in Tool.astro wires them to the calculator.
 import { REPS, RPES, defaultPercent } from '../lib/rpe.js';
 ---
 <section id="chart" aria-labelledby="chart-h" class="mx-auto mt-14 max-w-5xl px-4">
   <div class="rounded-2xl border border-line bg-card p-4 sm:p-6 sm:shadow-[6px_6px_0_0_var(--line)]">
     <h2 id="chart-h" class="text-2xl font-bold tracking-tight">RPE chart: percent of 1RM</h2>
-    <p class="mt-2 max-w-3xl text-muted">Find your reps down the side and your RPE across the top. The number is the share of your one-rep max (1RM) you can lift for that many reps at that effort. Every value is editable. Change a number and the calculator above uses it. Your changes stay on this device.</p>
+    <p class="mt-2 max-w-3xl text-muted">Find your reps down the side and your RPE across the top. The number is the share of your one-rep max (1RM) you can lift for that many reps at that effort. Every value is editable. Change a number and the calculator above uses it. Your changes stay on this device, and they belong to the chart version you picked.</p>
+    <p class="mt-2 text-sm"><strong>Chart version:</strong> <span data-version-note="current">Current RTS table (TRAC).</span><span data-version-note="y2016" hidden>2016 RTS article chart.</span> Change it with the "Chart version" switch in the calculator. <a href="#chart-source" class="underline">Sources and differences</a></p>
     <div class="mt-4 overflow-x-auto rounded-xl border border-line" tabindex="0" role="region" aria-label="RPE chart, scroll sideways on small screens">
       <table id="chart-table" class="w-full min-w-[40rem] text-left text-sm tabular-nums">
         <caption class="sr-only">Percent of one-rep max for each number of reps and each RPE</caption>
@@ -32,11 +33,16 @@ import { REPS, RPES, defaultPercent } from '../lib/rpe.js';
       </table>
     </div>
     <div class="mt-4 flex flex-wrap items-center gap-3">
-      <button type="button" id="chart-reset" disabled>Reset chart to RTS values</button>
-      <p id="chart-edits" role="status" aria-live="polite" class="min-h-[1.5rem] text-sm text-muted">No changes. The calculator uses the RTS chart as published.</p>
+      <button type="button" id="chart-reset" disabled>Reset my changes</button>
+      <p id="chart-edits" role="status" aria-live="polite" class="min-h-[1.5rem] text-sm text-muted">No changes. The calculator uses the Current RTS table (TRAC).</p>
     </div>
     <p class="mt-3 text-sm text-muted">Solid frame: your last set. Dotted frame: your next set. Dashed and bold: a value you changed.</p>
-    <p class="mt-3 max-w-3xl text-sm text-muted">Source: the RPE chart of Mike Tuchscherer (Reactive Training Systems, RTS). The RPE scale, based on reps in reserve (RIR), comes from Zourdos et al., 2016, and Helms et al., 2016. Values here run from 1 to 12 reps and from RPE 6 to 10. Copies of this chart on other sites can differ by about 0.5 percent in some cells. Use your own numbers if your coach gives you a different chart.</p>
+    <div id="chart-source" class="mt-4 max-w-3xl space-y-2 border-t border-line pt-4 text-sm text-muted">
+      <p class="font-semibold text-ink">Where these numbers come from</p>
+      <p><strong>Current RTS (default).</strong> The current Reactive Training Systems (RTS) table, the one in their TRAC system. We read it from the open data file <code>data-raw/rpe_tab_rts.csv</code> in the R package <code>strength</code> (github.com/alexpaynter/strength). Its documentation says the table was pulled from TRAC in December 2025. Reps 1 to 12 and RPE 6 to 10 are shown.</p>
+      <p><strong>2016 RTS article.</strong> The chart from the RTS article "Customizing Your RPE Chart" (January 6, 2016). We read it as copied in the open-source RPECalc app (github.com/tnapes96/RPECalc). That table stops at RPE 6.5, so we add the RPE 6 row with the reps plus RIR rule: reps and reps in reserve (RIR) add up to the same percentage.</p>
+      <p>The two versions are not the same. They differ by up to 7.6 points at high reps (12 reps at RPE 6 is 65.0% in the current table and 57.4% in the 2016 chart), and they agree within 0.1 point whenever reps plus reps in reserve is 10 or less (for example 6 reps at RPE 6, or 10 reps at RPE 10). Use the version your coach uses, or edit any value. The RPE scale based on reps in reserve comes from Zourdos et al., 2016, and Helms et al., 2016.</p>
+    </div>
   </div>
 </section>
 

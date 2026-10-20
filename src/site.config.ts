@@ -18,6 +18,6 @@ export default {
   skin: 'retro',                      // visual skin: minimal, swiss, clay or retro
   locale: 'en-US',                    // BCP 47 language tag
   ogImage: '/og.png',
-  category: 'HealthApplication',   // schema.org applicationCategory
+  category: 'SportsApplication',   // schema.org applicationCategory
   owner: 'RPE Chart',                // name used in legal pages (person or business)
 };

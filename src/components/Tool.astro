@@ -1,7 +1,7 @@
 ---
 // RPE calculator UI. Logic lives in src/lib/rpe.js (tested by npm test). The editable chart is in Chart.astro;
 // both parts share the script below.
-import { REPS } from '../lib/rpe.js';
+import { REPS, VERSIONS, DEFAULT_VERSION } from '../lib/rpe.js';
 ---
 <section id="tool" aria-label="RPE calculator" class="rounded-2xl border border-line bg-card p-4 sm:p-6 sm:shadow-[6px_6px_0_0_var(--line)]">
   <noscript><p class="mb-4 rounded-xl bg-brand-soft p-3 text-sm">This calculator needs JavaScript. The chart and tables below list the percentages you can read without it.</p></noscript>
@@ -25,6 +25,16 @@ import { REPS } from '../lib/rpe.js';
           </div>
         </fieldset>
       </div>
+
+      <fieldset>
+        <legend class="mb-2 text-sm font-semibold">Chart version</legend>
+        <div class="grid grid-cols-2 gap-2" id="version-group">
+          {Object.values(VERSIONS).map((v) => (
+            <label class="seg"><input type="radio" name="version" value={v.id} class="peer sr-only" checked={v.id === DEFAULT_VERSION} /><span class="seg-face">{v.label}</span></label>
+          ))}
+        </div>
+        <p class="mt-1 text-xs text-muted">The two RTS charts differ by up to 7.6 points at high reps. <a href="#chart-source" class="underline">See the sources</a>.</p>
+      </fieldset>
 
       <div>
         <label for="weight" class="mb-2 block text-sm font-semibold">Weight you lifted <span id="unit-label" class="font-normal text-muted">(lb)</span></label>
@@ -54,10 +64,12 @@ import { REPS } from '../lib/rpe.js';
 
     <!-- Results -->
     <div class="min-w-0 space-y-4 md:sticky md:top-20">
-      <div class="min-h-[10.5rem] rounded-xl bg-brand-soft p-4" id="result-box">
+      <div class="rounded-xl bg-brand-soft p-4" id="result-box">
         <p class="text-sm font-semibold uppercase tracking-wide text-brand-ink">Estimated 1RM</p>
         <p id="e1rm-out" class="mt-2 font-mono text-5xl font-bold tabular-nums leading-none">-</p>
         <p id="e1rm-status" role="status" aria-live="polite" class="mt-3 min-h-[3rem] text-base font-medium"></p>
+        <p id="chart-used" class="mt-1 text-sm opacity-90"></p>
+        <p id="reliability" class="mt-2 rounded-lg border border-current/40 p-2 text-sm font-medium" hidden></p>
       </div>
 
       <div id="plan-box" class="rounded-xl border border-line p-4">
@@ -80,7 +92,7 @@ import { REPS } from '../lib/rpe.js';
 
         <fieldset class="mt-3">
           <legend class="mb-2 text-sm font-semibold">Round to the nearest</legend>
-          <div class="grid grid-cols-3 gap-2" id="step-group"></div>
+          <div class="grid grid-cols-4 gap-2" id="step-group"></div>
           <p class="mt-1 text-xs text-muted">This is the smallest jump your plates can make: two of your smallest plates.</p>
         </fieldset>
       </div>
@@ -105,9 +117,18 @@ import { REPS } from '../lib/rpe.js';
       </table>
     </div>
   </div>
+
+  <!-- Phones: a slim result bar while the real result is off screen. Hidden from screen readers (the live regions above say it). -->
+  <div id="result-bar" class="result-bar" aria-hidden="true" hidden>
+    <span>1RM <strong id="bar-e1rm">-</strong></span>
+    <span>Next set <strong id="bar-next">-</strong></span>
+  </div>
 </section>
 
 <style is:global>
+  .result-bar { position:fixed; left:0; right:0; bottom:0; z-index:30; display:flex; justify-content:space-between; gap:1rem; padding:.7rem 1rem calc(.7rem + env(safe-area-inset-bottom)); background:var(--brand-ink); color:#fff; font-size:.95rem; box-shadow:0 -2px 12px rgb(0 0 0 / .25); }
+  .result-bar strong { font-family:var(--font-mono); font-size:1.15rem; font-variant-numeric:tabular-nums; }
+  @media (min-width:768px) { .result-bar { display:none; } }
   .seg-face { display:flex; min-height:3rem; align-items:center; justify-content:center; border-radius:.75rem; border:1px solid var(--edge); background:var(--paper); padding:.4rem .5rem; font-weight:600; font-size:.95rem; cursor:pointer; text-align:center; transition:background-color .12s,border-color .12s; user-select:none; font-variant-numeric:tabular-nums; }
   .seg-face small { display:block; font-size:.7rem; font-weight:500; opacity:.85; line-height:1; }
   .seg-face.tall { flex-direction:column; gap:.15rem; }
@@ -128,14 +149,15 @@ import { REPS } from '../lib/rpe.js';
 </style>
 <script>
   import {
-    RPES, WHOLE_RPES, REPS, STEPS, DEFAULT_STEP, MAX_WEIGHT, cellKey, defaultPercent, percentAt, isValidPercent,
+    RPES, WHOLE_RPES, REPS, STEPS, DEFAULT_STEP, MAX_WEIGHT, HIGH_REPS, VERSIONS, DEFAULT_VERSION, isVersion, cellKey, defaultPercent, percentAt, isValidPercent,
     e1rm, loadFor, roundTo, convertWeight, parseNumber, fmt, rpeToRir, rpeMeaning,
   } from '../lib/rpe.js';
 
   type Unit = 'lb' | 'kg';
   type Scale = 'rpe' | 'rir';
+  type Edits = Record<string, number>;
 
-  const KEY = 'rpe-chart-v1';
+  const KEY = 'rpe-chart-v2';
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
   const state = {
@@ -148,8 +170,12 @@ import { REPS } from '../lib/rpe.js';
     tRpe: 8,
     step: { ...DEFAULT_STEP } as Record<Unit, number>,
     half: false,
-    edits: {} as Record<string, number>,
+    version: DEFAULT_VERSION as string,
+    // Edits belong to one chart version, so switching version never mixes them.
+    editsBy: {} as Record<string, Edits>,
   };
+  for (const v of Object.keys(VERSIONS)) state.editsBy[v] = {};
+  const edits = () => state.editsBy[state.version];
 
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || 'null');
@@ -163,10 +189,15 @@ import { REPS } from '../lib/rpe.js';
       if ((RPES as number[]).includes(s.tRpe)) state.tRpe = s.tRpe;
       for (const u of ['lb', 'kg'] as Unit[]) if (s.step && (STEPS[u] as number[]).includes(s.step[u])) state.step[u] = s.step[u];
       state.half = s.half === true;
-      if (s.edits && typeof s.edits === 'object') {
-        for (const [k, v] of Object.entries(s.edits)) {
-          const m = /^(\d+)@(\d+(?:\.5)?)$/.exec(k);
-          if (m && (REPS as number[]).includes(+m[1]) && (RPES as number[]).includes(+m[2]) && isValidPercent(v)) state.edits[k] = v as number;
+      if (isVersion(s.version)) state.version = s.version;
+      if (s.editsBy && typeof s.editsBy === 'object') {
+        for (const ver of Object.keys(VERSIONS)) {
+          const saved = s.editsBy[ver];
+          if (!saved || typeof saved !== 'object') continue;
+          for (const [k, v] of Object.entries(saved)) {
+            const m = /^(\d+)@(\d+(?:\.5)?)$/.exec(k);
+            if (m && (REPS as number[]).includes(+m[1]) && (RPES as number[]).includes(+m[2]) && isValidPercent(v)) state.editsBy[ver][k] = v as number;
+          }
         }
       }
     }
@@ -186,6 +217,8 @@ import { REPS } from '../lib/rpe.js';
     (document.querySelector(`input[name=unit][value=${u}]`) as HTMLInputElement).checked = true;
     (document.querySelector(`input[name=scale][value=${state.scale}]`) as HTMLInputElement).checked = true;
     (document.querySelector(`input[name=reps][value="${state.reps}"]`) as HTMLInputElement).checked = true;
+    (document.querySelector(`input[name=version][value=${state.version}]`) as HTMLInputElement).checked = true;
+    document.querySelectorAll<HTMLElement>('[data-version-note]').forEach((el) => { el.hidden = el.dataset.versionNote !== state.version; });
     $('unit-label').textContent = `(${u})`;
     $<HTMLInputElement>('weight').value = fmt(state.weight);
     $<HTMLInputElement>('half').checked = state.half;
@@ -218,15 +251,16 @@ import { REPS } from '../lib/rpe.js';
     document.querySelectorAll<HTMLInputElement>('#chart input[data-reps]').forEach((inp) => {
       const r = Number(inp.dataset.reps), p = Number(inp.dataset.rpe);
       const k = cellKey(r, p);
-      const isEdit = k in state.edits;
+      const isEdit = k in edits();
       if (isEdit) edited++;
       inp.classList.toggle('edited', isEdit);
       inp.classList.toggle('is-set', r === state.reps && p === state.rpe);
       inp.classList.toggle('is-aim', r === state.tReps && p === state.tRpe);
-      if (document.activeElement !== inp) { inp.value = fmt(percentAt(r, p, state.edits)); inp.removeAttribute('aria-invalid'); }
+      if (document.activeElement !== inp) { inp.value = fmt(percentAt(r, p, edits(), state.version)); inp.removeAttribute('aria-invalid'); }
     });
     const note = $('chart-edits');
-    note.textContent = edited ? `${edited} ${edited === 1 ? 'value is' : 'values are'} changed from the RTS chart. The calculator uses your values.` : 'No changes. The calculator uses the RTS chart as published.';
+    const name = VERSIONS[state.version].name;
+    note.textContent = edited ? `${edited} ${edited === 1 ? 'value is' : 'values are'} changed from the ${name}. The calculator uses your values.` : `No changes. The calculator uses the ${name}.`;
     $<HTMLButtonElement>('chart-reset').disabled = edited === 0;
   }
 
@@ -238,7 +272,18 @@ import { REPS } from '../lib/rpe.js';
     const tStatus = $('target-status');
     $('rpe-meaning').textContent = `${rpeLabel(state.rpe)}: ${rpeMeaning(state.rpe)}`;
 
-    const oneRm = e1rm(state.weight, state.reps, state.rpe, state.edits);
+    const chartUsed = $('chart-used');
+    chartUsed.textContent = `Chart: ${VERSIONS[state.version].name}.`;
+    const note = $('reliability');
+    const other = Object.keys(VERSIONS).find((v) => v !== state.version) as string;
+    const gap = Math.abs(defaultPercent(state.reps, state.rpe, state.version) - defaultPercent(state.reps, state.rpe, other));
+    const gapText = gap >= 0.5 ? ` The ${VERSIONS[other].name} has ${fmt(defaultPercent(state.reps, state.rpe, other))}% for this set, ${fmt(Math.round(gap * 10) / 10)} points ${defaultPercent(state.reps, state.rpe, other) < defaultPercent(state.reps, state.rpe, state.version) ? 'lower' : 'higher'}.` : '';
+    if (state.reps > HIGH_REPS) note.textContent = `Rough estimate. People often misjudge how many reps are left in a long set, and the chart versions differ most above ${HIGH_REPS} reps.${gapText}`;
+    else if (state.reps > 5) note.textContent = `Less certain above 5 reps. Estimates work best for heavy sets of 1 to 5 reps close to failure.${gapText}`;
+    else note.textContent = '';
+    note.hidden = !note.textContent;
+
+    const oneRm = e1rm(state.weight, state.reps, state.rpe, edits(), state.version);
     const head = $('plan-head'), body = $('plan-body');
     const cols = (state.half ? RPES : WHOLE_RPES) as number[];
 
@@ -247,6 +292,8 @@ import { REPS } from '../lib/rpe.js';
       status.textContent = 'Enter the weight you lifted to see your estimated 1RM.';
       tOut.textContent = '-';
       tStatus.textContent = '';
+      $('bar-e1rm').textContent = '-';
+      $('bar-next').textContent = '-';
       head.innerHTML = '';
       body.innerHTML = '';
       renderChart();
@@ -254,25 +301,26 @@ import { REPS } from '../lib/rpe.js';
       return;
     }
 
-    const pct = percentAt(state.reps, state.rpe, state.edits);
+    const pct = percentAt(state.reps, state.rpe, edits(), state.version);
     out.textContent = `${fmt(Math.round(oneRm * 10) / 10)} ${u}`;
     status.textContent = state.reps === 1 && state.rpe === 10
       ? `A single at ${rpeLabel(state.rpe)} is your 1RM: ${fmt(state.weight)} ${u}.`
       : `${fmt(state.weight)} ${u} for ${state.reps} ${state.reps === 1 ? 'rep' : 'reps'} at ${rpeLabel(state.rpe)} is ${fmt(pct)}% of your 1RM.`;
 
-    const exact = loadFor(oneRm, state.tReps, state.tRpe, state.edits);
+    const exact = loadFor(oneRm, state.tReps, state.tRpe, edits(), state.version);
     const rounded = roundTo(exact, step());
-    const tp = percentAt(state.tReps, state.tRpe, state.edits);
+    const tp = percentAt(state.tReps, state.tRpe, edits(), state.version);
     tOut.textContent = `${fmt(rounded)} ${u}`;
+    $('bar-e1rm').textContent = out.textContent;
+    $('bar-next').textContent = tOut.textContent;
     tStatus.textContent = `${state.tReps} ${state.tReps === 1 ? 'rep' : 'reps'} at ${rpeLabel(state.tRpe)} is ${fmt(tp)}% of 1RM. Exact: ${fmt(Math.round(exact * 10) / 10)} ${u}, rounded to ${step()} ${u}.`;
 
     head.innerHTML = `<tr><th scope="col">Reps</th>${cols.map((r) => `<th scope="col">${rpeLabel(r)}<small>${otherLabel(r)}</small></th>`).join('')}</tr>`;
     body.innerHTML = (REPS as number[]).map((reps) =>
       `<tr><th scope="row">${reps}</th>${cols.map((r) => {
-        const w = roundTo(loadFor(oneRm, reps, r, state.edits), step());
-        const cls = reps === state.reps && r === state.rpe ? ' class="is-set"' : reps === state.tReps && r === state.tRpe ? ' class="is-aim"' : '';
-        const cls2 = reps === state.reps && r === state.rpe && reps === state.tReps && r === state.tRpe ? ' class="is-set is-aim"' : cls;
-        return `<td${cls2}>${fmt(w)}</td>`;
+        const w = roundTo(loadFor(oneRm, reps, r, edits(), state.version), step());
+        const cellClass = [reps === state.reps && r === state.rpe && 'is-set', reps === state.tReps && r === state.tRpe && 'is-aim'].filter(Boolean).join(' ');
+        return `<td${cellClass ? ` class="${cellClass}"` : ''}>${fmt(w)}</td>`;
       }).join('')}</tr>`).join('');
     renderChart();
     save();
@@ -316,6 +364,7 @@ import { REPS } from '../lib/rpe.js';
     state.scale = (e.target as HTMLInputElement).value as Scale;
     buildStatic(); render();
   });
+  $('version-group').addEventListener('change', (e) => { state.version = (e.target as HTMLInputElement).value; buildStatic(); render(); });
   $('reps-group').addEventListener('change', (e) => { state.reps = Number((e.target as HTMLInputElement).value); render(); });
   $('rpe-group').addEventListener('change', (e) => { state.rpe = Number((e.target as HTMLInputElement).value); render(); });
   $('t-reps').addEventListener('change', (e) => { state.tReps = Number((e.target as HTMLSelectElement).value); render(); });
@@ -332,20 +381,29 @@ import { REPS } from '../lib/rpe.js';
     const v = parseNumber(inp.value);
     if (isValidPercent(v)) {
       inp.removeAttribute('aria-invalid');
-      if (v === defaultPercent(r, p)) delete state.edits[k]; else state.edits[k] = v;
+      if (v === defaultPercent(r, p, state.version)) delete edits()[k]; else edits()[k] = v;
     } else {
+      // Keep the saved edit while the text is unfinished (for example "8" on the way to "85"). Leaving the cell restores it.
       inp.setAttribute('aria-invalid', 'true');
-      delete state.edits[k];
     }
     render();
   });
   chart.addEventListener('focusout', (e) => {
     const inp = e.target as HTMLInputElement;
     if (!inp.dataset?.reps) return;
-    inp.value = fmt(percentAt(Number(inp.dataset.reps), Number(inp.dataset.rpe), state.edits));
+    inp.value = fmt(percentAt(Number(inp.dataset.reps), Number(inp.dataset.rpe), edits(), state.version));
     inp.removeAttribute('aria-invalid');
   });
-  $('chart-reset').addEventListener('click', () => { state.edits = {}; render(); });
+  $('chart-reset').addEventListener('click', () => { state.editsBy[state.version] = {}; render(); });
+
+  // Phones: show the slim result bar while the calculator is on screen but the result box is not.
+  const bar = $('result-bar');
+  let toolOn = false, resultOn = false;
+  const syncBar = () => { bar.hidden = !(toolOn && !resultOn); };
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver((es) => { toolOn = es[es.length - 1].isIntersecting; syncBar(); }).observe($('tool'));
+    new IntersectionObserver((es) => { resultOn = es[es.length - 1].isIntersecting; syncBar(); }).observe($('result-box'));
+  }
 
   buildStatic();
   render();
