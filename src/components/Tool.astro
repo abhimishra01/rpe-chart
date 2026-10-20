@@ -128,6 +128,7 @@ import { REPS, VERSIONS, DEFAULT_VERSION } from '../lib/rpe.js';
 <style is:global>
   .result-bar { position:fixed; left:0; right:0; bottom:0; z-index:30; display:flex; justify-content:space-between; gap:1rem; padding:.7rem 1rem calc(.7rem + env(safe-area-inset-bottom)); background:var(--brand-ink); color:#fff; font-size:.95rem; box-shadow:0 -2px 12px rgb(0 0 0 / .25); }
   .result-bar strong { font-family:var(--font-mono); font-size:1.15rem; font-variant-numeric:tabular-nums; }
+  html { scroll-padding-bottom: 5rem; } /* keep a focused control clear of the phone result bar and the fold (the radios are hidden inputs) */
   @media (min-width:768px) { .result-bar { display:none; } }
   .seg-face { display:flex; min-height:3rem; align-items:center; justify-content:center; border-radius:.75rem; border:1px solid var(--edge); background:var(--paper); padding:.4rem .5rem; font-weight:600; font-size:.95rem; cursor:pointer; text-align:center; transition:background-color .12s,border-color .12s; user-select:none; font-variant-numeric:tabular-nums; }
   .seg-face small { display:block; font-size:.7rem; font-weight:500; opacity:.85; line-height:1; }
@@ -333,7 +334,8 @@ import { REPS, VERSIONS, DEFAULT_VERSION } from '../lib/rpe.js';
     $<HTMLInputElement>('weight').value = fmt(state.weight);
     render();
   }
-  const nudge = (dir: 1 | -1) => setWeight(Math.max(step(), (state.weight || 0) + dir * step()));
+  // Minus never raises the weight: at or below one step it keeps the weight.
+  const nudge = (dir: 1 | -1) => { const w = state.weight || 0; setWeight(dir === 1 ? w + step() : Math.min(w, Math.max(step(), w - step()))); };
 
   // Weight field
   const wEl = $<HTMLInputElement>('weight');
