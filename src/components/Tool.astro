@@ -159,6 +159,7 @@ import { REPS, VERSIONS, DEFAULT_VERSION } from '../lib/rpe.js';
   type Edits = Record<string, number>;
 
   const KEY = 'rpe-chart-v2';
+  const MIN_WEIGHT = 1; // a smaller weight is a typing slip and would show a 1RM of "0"
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
   const state = {
@@ -183,7 +184,7 @@ import { REPS, VERSIONS, DEFAULT_VERSION } from '../lib/rpe.js';
     if (s && typeof s === 'object') {
       if (s.unit === 'lb' || s.unit === 'kg') state.unit = s.unit;
       if (s.scale === 'rpe' || s.scale === 'rir') state.scale = s.scale;
-      if (typeof s.weight === 'number' && s.weight > 0 && s.weight <= MAX_WEIGHT) state.weight = s.weight;
+      if (typeof s.weight === 'number' && s.weight >= MIN_WEIGHT && s.weight <= MAX_WEIGHT) state.weight = s.weight;
       if ((REPS as number[]).includes(s.reps)) state.reps = s.reps;
       if ((RPES as number[]).includes(s.rpe)) state.rpe = s.rpe;
       if ((REPS as number[]).includes(s.tReps)) state.tReps = s.tReps;
@@ -329,7 +330,7 @@ import { REPS, VERSIONS, DEFAULT_VERSION } from '../lib/rpe.js';
 
   function setWeight(v: number) {
     if (!(v > 0)) return;
-    state.weight = Math.min(Math.round(v * 100) / 100, MAX_WEIGHT);
+    state.weight = Math.min(Math.max(Math.round(v * 100) / 100, MIN_WEIGHT), MAX_WEIGHT);
     anchor = { unit: state.unit, weight: state.weight };
     $<HTMLInputElement>('weight').value = fmt(state.weight);
     render();
@@ -341,13 +342,13 @@ import { REPS, VERSIONS, DEFAULT_VERSION } from '../lib/rpe.js';
   const wEl = $<HTMLInputElement>('weight');
   wEl.addEventListener('input', () => {
     const v = parseNumber(wEl.value);
-    wEl.setAttribute('aria-invalid', String(wEl.value.trim() !== '' && !(v > 0)));
-    state.weight = v > 0 ? Math.min(v, MAX_WEIGHT) : 0;
+    wEl.setAttribute('aria-invalid', String(wEl.value.trim() !== '' && !(v >= MIN_WEIGHT)));
+    state.weight = v >= MIN_WEIGHT ? Math.min(v, MAX_WEIGHT) : 0;
     if (v > MAX_WEIGHT) wEl.value = fmt(MAX_WEIGHT);
     anchor = { unit: state.unit, weight: state.weight };
     render();
   });
-  wEl.addEventListener('blur', () => { if (state.weight > 0) { wEl.value = fmt(state.weight); wEl.removeAttribute('aria-invalid'); } });
+  wEl.addEventListener('blur', () => { if (state.weight >= MIN_WEIGHT) { wEl.value = fmt(state.weight); wEl.removeAttribute('aria-invalid'); } });
   wEl.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowUp') { e.preventDefault(); nudge(1); }
     if (e.key === 'ArrowDown') { e.preventDefault(); nudge(-1); }
@@ -358,7 +359,7 @@ import { REPS, VERSIONS, DEFAULT_VERSION } from '../lib/rpe.js';
   $('unit-group').addEventListener('change', (e) => {
     const to = (e.target as HTMLInputElement).value as Unit;
     if (to === state.unit) return;
-    state.weight = anchor.unit === to && anchor.weight > 0 ? anchor.weight : Math.round(convertWeight(state.weight, state.unit, to) * 10) / 10;
+    state.weight = anchor.unit === to && anchor.weight > 0 ? anchor.weight : state.weight > 0 ? Math.max(MIN_WEIGHT, Math.round(convertWeight(state.weight, state.unit, to) * 10) / 10) : 0;
     state.unit = to;
     buildStatic(); render();
   });
