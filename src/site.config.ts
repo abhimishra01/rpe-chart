@@ -1,6 +1,6 @@
 // ONE config file. Change values here; every page reads from it.
 // Keep this file plain (no type-only syntax): scripts/deploy.mjs imports it directly.
-export default {
+const config = {
   name: 'RPE Chart',                 // shown in header, title, footer
   domain: 'rpechart.com',            // no https://, no www. Used for canonical, sitemap, robots
   cloudflareProject: 'rpe-chart',    // Cloudflare Pages project name (used by npm run deploy)
@@ -20,4 +20,20 @@ export default {
   ogImage: '/og.png',
   category: 'SportsApplication',   // schema.org applicationCategory
   owner: 'RPE Chart',                // name used in legal pages (person or business)
+};
+
+// Bingemind build (SITE_MODE=bingemind): the tool lives at https://bingemind.com/<slug>/.
+// Canonical URLs point there in every build, including the GitHub Pages preview.
+const bingemind = typeof process !== 'undefined' && process.env.SITE_MODE === 'bingemind';
+const slug = config.cloudflareProject;
+export default {
+  ...config,
+  bingemind,
+  slug,
+  canonicalBase: `https://bingemind.com/${slug}`,
+  host: bingemind ? `bingemind.com/${slug}/` : config.domain,
+  owner: bingemind ? 'Bingemind' : config.owner,
+  // No invented mailbox: Bingemind builds link to the Bingemind contact section.
+  contactHref: bingemind ? 'https://bingemind.com/#contact' : `mailto:${config.email}`,
+  contactLabel: bingemind ? 'bingemind.com/#contact' : config.email,
 };
